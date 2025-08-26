@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TT Fitness - Workout Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563EB',
+                        'primary-dark': '#1D4ED8',
+                        'primary-light': '#3B82F6',
+                        secondary: '#06B6D4',
+                        'secondary-dark': '#0891B2'
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .calendar-day {
+            transition: all 0.2s ease-in-out;
+        }
+        .calendar-day:hover {
+            transform: scale(1.05);
+        }
+        .has-workout {
+            background: linear-gradient(135deg, #2563EB, #3B82F6);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen">
+    <!-- Dark mode detection -->
+    <script>
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+    </script>
+
+    <!-- Header -->
+    <header class="bg-primary dark:bg-primary-dark text-white shadow-lg fixed w-full top-0 z-40">
+        <div class="px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-white/20 p-2 rounded-lg">
+                        <span class="text-xl">💪</span>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold">TT Fitness</h1>
+                        <p class="text-white/80 text-xs">Workout Tracker</p>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <button id="exportBtn" class="bg-white/20 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-white/30 transition-colors">
+                        💾
+                    </button>
+                    <button id="importBtn" class="bg-white/20 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-white/30 transition-colors">
+                        📁
+                    </button>
+                    <button id="addWorkoutBtn" class="bg-white text-primary px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors">
+                        + New
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="flex pt-20">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-white dark:bg-gray-800 shadow-lg h-screen fixed overflow-y-auto">
+            <nav class="p-4">
+                <div class="space-y-2">
+                    <button onclick="showTab('dashboard')" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-colors flex items-center space-x-3 bg-primary text-white">
+                        <span>📊</span>
+                        <span>Dashboard</span>
+                    </button>
+                    <button onclick="showTab('workouts')" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-colors flex items-center space-x-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <span>🏋️</span>
+                        <span>Workouts</span>
+                    </button>
+                    <button onclick="showTab('calendar')" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-colors flex items-center space-x-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <span>📅</span>
+                        <span>Calendar</span>
+                    </button>
+                    <button onclick="showTab('progress')" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-colors flex items-center space-x-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <span>📈</span>
+                        <span>Progress</span>
+                    </button>
+                    <button onclick="showTab('templates')" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-colors flex items-center space-x-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <span>📋</span>
+                        <span>Templates</span>
+                    </button>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 ml-64 p-6">
+            <!-- Dashboard Tab -->
+            <div id="dashboard-tab" class="tab-content">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Dashboard</h2>
+                    <p class="text-gray-600 dark:text-gray-400">Overview of your fitness journey</p>
+                </div>
+                
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="bg-primary/10 p-3 rounded-lg">
+                                <span class="text-2xl">🏋️</span>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Total Workouts</p>
+                                <p id="totalWorkouts" class="text-2xl font-bold text-gray-900 dark:text-white">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="bg-secondary/10 p-3 rounded-lg">
+                                <span class="text-2xl">💪</span>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm text-gray-600 dark:text-gray-400">This Week</p>
+                                <p id="weekWorkouts" class="text-2xl font-bold text-gray-900 dark:text-white">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="bg-green-100 p-3 rounded-lg">
+                                <span class="text-2xl">🔥</span>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Streak</p>
+                                <p id="streakDays" class="text-2xl font-bold text-gray-900 dark:text-white">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Workouts -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Workouts</h3>
+                    <div id="recentWorkouts" class="space-y-4">
+                        <p class="text-gray-500 dark:text-gray-400">No workouts yet. Create your first workout!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workouts Tab -->
+            <div id="workouts-tab" class="tab-content hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Workouts</h2>
+                    <p class="text-gray-600 dark:text-gray-400">Manage your workout history</p>
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyState" class="text-center py-12 hidden">
+                    <div class="text-6xl mb-4">🏋️</div>
+                    <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">No workouts yet</h3>
+                    <p class="text-gray-500 dark:text-gray-400 mb-6">Start tracking your fitness journey!</p>
+                    <button class="bg-primary text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-dark transition-colors" onclick="openWorkoutModal()">
+                        Create Your First Workout
+                    </button>
+                </div>
+
+                <!-- Workouts List -->
+                <div id="workoutsList" class="space-y-4"></div>
+            </div>
+
+            <!-- Calendar Tab -->
+            <div id="calendar-tab" class="tab-content hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Calendar</h2>
+                    <p class="text-gray-600 dark:text-gray-400">View your workouts in calendar format</p>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 id="calendarMonth" class="text-xl font-semibold text-gray-900 dark:text-white"></h3>
+                        <div class="flex space-x-2">
+                            <button onclick="previousMonth()" class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                </svg>
+                            </button>
+                            <button onclick="nextMonth()" class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-7 gap-2">
+                        <div class="text-center text-sm font-medium text-gray-500 dark:text-gray-400 p-2">Sun</div>
+                        <div class="text-center text-sm font-medium text-gray-500 dark:text-gray-400 p-2">Mon</div>
+                        <div class="text-center text-sm font-medium text-gray-500 dark:text-gray-400 p-2">Tue</div>
+                        <div class="text-center text-sm font-medium text-gray-500 dark:text-gray-400 p-2">Wed</div>
+                        <div class="text-center text-sm font-medium text-gray-500 dark:text-gray-400 p-2">Thu</div>
+                        <div class="text-center text-sm font-medium text-gray-500 dark:text-gray-400 p-2">Fri</div>
+                        <div class="text-center text-sm font-medium text-gray-500 dark:text-gray-400 p-2">Sat</div>
+                    </div>
+                    
+                    <div id="calendarGrid" class="grid grid-cols-7 gap-2 mt-2">
+                        <!-- Calendar days will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Tab -->
+            <div id="progress-tab" class="tab-content hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Progress</h2>
+                    <p class="text-gray-600 dark:text-gray-400">Track your fitness progress over time</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Workout Frequency Chart -->
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Workout Frequency</h3>
+                        <canvas id="frequencyChart" width="400" height="200"></canvas>
+                    </div>
+
+                    <!-- Weight Progress Chart -->
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Exercise Progress</h3>
+                        <div class="mb-4">
+                            <select id="exerciseSelect" class="w-full text-base px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white">
+                                <option value="">Select an exercise</option>
+                            </select>
+                        </div>
+                        <canvas id="progressChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Templates Tab -->
+            <div id="templates-tab" class="tab-content hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Templates</h2>
+                    <p class="text-gray-600 dark:text-gray-400">Manage your workout templates</p>
+                </div>
+
+                <div id="templatesTabList" class="space-y-4">
+                    <!-- Templates will be populated by JavaScript -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Workout Modal (same as before, updating for new styles) -->
+    <div id="workoutModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 id="modalTitle" class="text-xl font-bold text-gray-900 dark:text-white">Add New Workout</h2>
+                    <button onclick="closeWorkoutModal()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <form id="workoutForm">
+                    <!-- Template Selection -->
+                    <div id="templateSection" class="mb-6">
+                        <div class="flex justify-between items-center mb-3">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Use Template</label>
+                            <button type="button" onclick="showTemplateManager()" class="text-sm text-primary hover:text-primary-dark">Manage Templates</button>
+                        </div>
+                        <div id="templatesList" class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
+                            <!-- Templates will be populated by JavaScript -->
+                        </div>
+                        <div class="text-center">
+                            <button type="button" onclick="showTemplateSelection(false)" class="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">Start from scratch instead</button>
+                        </div>
+                    </div>
+
+                    <!-- Workout Date -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Workout Date</label>
+                        <input type="date" id="workoutDate" class="w-full text-base px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white" required>
+                    </div>
+
+                    <!-- Workout Name -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Workout Name</label>
+                        <input type="text" id="workoutName" placeholder="e.g., Push Day, Legs, Full Body" class="w-full text-base px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white" required>
+                    </div>
+
+                    <!-- Exercises -->
+                    <div class="mb-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Exercises</label>
+                            <button type="button" onclick="addExercise()" class="text-primary hover:text-primary-dark font-medium">+ Add Exercise</button>
+                        </div>
+                        <div id="exercisesList" class="space-y-4"></div>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeWorkoutModal()" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors">
+                            Save Workout
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Manager Modal -->
+    <div id="templateManagerModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">Manage Templates</h2>
+                    <button onclick="closeTemplateManager()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div id="templatesManagerList" class="space-y-4">
+                    <!-- Templates will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Delete Modal -->
+    <div id="confirmModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Confirm Delete</h3>
+                <p id="confirmMessage" class="text-gray-600 dark:text-gray-400 mb-6">Are you sure you want to delete this workout? This action cannot be undone.</p>
+                <div class="flex justify-end space-x-3">
+                    <button onclick="closeConfirmModal()" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button id="confirmDeleteBtn" class="px-4 py-2 bg-red-500 text-white hover:bg-red-600 rounded-lg transition-colors">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let workouts = [];
+        let templates = [
+            {
+                id: 1,
+                name: "Push Day",
+                exercises: [
+                    { name: "Bench Press", muscleGroup: "Chest", sets: 4, reps: 8, weight: 0 },
+                    { name: "Overhead Press", muscleGroup: "Shoulders", sets: 4, reps: 8, weight: 0 },
+                    { name: "Incline Dumbbell Press", muscleGroup: "Chest", sets: 3, reps: 10, weight: 0 },
+                    { name: "Tricep Dips", muscleGroup: "Triceps", sets: 3, reps: 12, weight: 0 },
+                    { name: "Lateral Raises", muscleGroup: "Shoulders", sets: 3, reps: 15, weight: 0 }
+                ]
+            },
+            {
+                id: 2,
+                name: "Pull Day",
+                exercises: [
+                    { name: "Pull-ups", muscleGroup: "Back", sets: 4, reps: 8, weight: 0 },
+                    { name: "Barbell Rows", muscleGroup: "Back", sets: 4, reps: 8, weight: 0 },
+                    { name: "Lat Pulldowns", muscleGroup: "Back", sets: 3, reps: 10, weight: 0 },
+                    { name: "Bicep Curls", muscleGroup: "Biceps", sets: 3, reps: 12, weight: 0 },
+                    { name: "Face Pulls", muscleGroup: "Rear Delts", sets: 3, reps: 15, weight: 0 }
+                ]
+            },
+            {
+                id: 3,
+                name: "Leg Day",
+                exercises: [
+                    { name: "Squats", muscleGroup: "Legs", sets: 4, reps: 8, weight: 0 },
+                    { name: "Romanian Deadlifts", muscleGroup: "Hamstrings", sets: 4, reps: 8, weight: 0 },
+                    { name: "Leg Press", muscleGroup: "Legs", sets: 3, reps: 12, weight: 0 },
+                    { name: "Walking Lunges", muscleGroup: "Legs", sets: 3, reps: 10, weight: 0 },
+                    { name: "Calf Raises", muscleGroup: "Calves", sets: 4, reps: 15, weight: 0 }
+                ]
+            }
+        ];
+        let currentEditingId = null;
+        let exerciseCounter = 0;
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+        let frequencyChart = null;
+        let progressChart = null;
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            updateAllViews();
+            generateCalendar();
+            initializeCharts();
+            
+            // Set today's date as default
+            document.getElementById('workoutDate').valueAsDate = new Date();
+
+            // Event listeners
+            document.getElementById('addWorkoutBtn').addEventListener('click', openWorkoutModal);
+            document.getElementById('exportBtn').addEventListener('click', exportData);
+            document.getElementById('importBtn').addEventListener('click', () => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json';
+                input.onchange = importData;
+                input.click();
+            });
+            document.getElementById('workoutForm').addEventListener('submit', handleWorkoutSubmit);
+            document.getElementById('exerciseSelect').addEventListener('change', updateProgressChart);
+        });
+
+        // Tab Navigation
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            
+            // Remove active state from all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-primary', 'text-white');
+                btn.classList.add('text-gray-700', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+            });
+            
+            // Show selected tab
+            document.getElementById(`${tabName}-tab`).classList.remove('hidden');
+            
+            // Add active state to clicked button
+            event.target.classList.add('bg-primary', 'text-white');
+            event.target.classList.remove('text-gray-700', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+
+            // Update views when switching tabs
+            if (tabName === 'calendar') {
+                generateCalendar();
+            } else if (tabName === 'progress') {
+                updateProgressChart();
+            } else if (tabName === 'templates') {
+                populateTemplatesTab();
+            }
+        }
+
+        // Dashboard functions
+        function updateDashboard() {
+            const totalWorkouts = workouts.length;
+            const weekStart = new Date();
+            weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+            const weekWorkouts = workouts.filter(w => new Date(w.date) >= weekStart).length;
+            
+            // Calculate streak
+            const streak = calculateStreak();
+            
+            document.getElementById('totalWorkouts').textContent = totalWorkouts;
+            document.getElementById('weekWorkouts').textContent = weekWorkouts;
+            document.getElementById('streakDays').textContent = streak;
+
+            // Update recent workouts
+            const recentWorkoutsContainer = document.getElementById('recentWorkouts');
+            if (workouts.length === 0) {
+                recentWorkoutsContainer.innerHTML = '<p class="text-gray-500 dark:text-gray-400">No workouts yet. Create your first workout!</p>';
+            } else {
+                const recentWorkouts = workouts.slice(0, 3);
+                recentWorkoutsContainer.innerHTML = recentWorkouts.map(workout => `
+                    <div class="border-l-4 border-primary pl-4">
+                        <h4 class="font-medium text-gray-900 dark:text-white">${workout.name}</h4>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">${formatDate(workout.date)} • ${workout.exercises.length} exercises</p>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function calculateStreak() {
+            if (workouts.length === 0) return 0;
+            
+            const sortedWorkouts = [...workouts].sort((a, b) => new Date(b.date) - new Date(a.date));
+            let streak = 0;
+            let currentDate = new Date();
+            currentDate.setHours(0, 0, 0, 0);
+            
+            for (let workout of sortedWorkouts) {
+                const workoutDate = new Date(workout.date);
+                workoutDate.setHours(0, 0, 0, 0);
+                
+                const diffDays = Math.floor((currentDate - workoutDate) / (1000 * 60 * 60 * 24));
+                
+                if (diffDays === streak) {
+                    streak++;
+                    currentDate.setDate(currentDate.getDate() - 1);
+                } else if (diffDays > streak) {
+                    break;
+                }
+            }
+            
+            return streak;
+        }
+
+        // Calendar functions
+        function generateCalendar() {
+            const calendarGrid = document.getElementById('calendarGrid');
+            const monthElement = document.getElementById('calendarMonth');
+            
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'];
+            
+            monthElement.textContent = `${monthNames[currentMonth]} ${currentYear}`;
+            
+            const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            
+            let calendarHTML = '';
+            
+            // Empty cells for days before month starts
+            for (let i = 0; i < firstDay; i++) {
+                calendarHTML += '<div class="calendar-day p-3"></div>';
+            }
+            
+            // Days of the month
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateString = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const hasWorkout = workouts.some(w => w.date === dateString);
+                const isToday = new Date().toDateString() === new Date(currentYear, currentMonth, day).toDateString();
+                
+                calendarHTML += `
+                    <div class="calendar-day p-3 text-center cursor-pointer rounded-lg border dark:border-gray-600 ${
+                        hasWorkout ? 'has-workout text-white' : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600'
+                    } ${isToday ? 'ring-2 ring-primary' : ''}" onclick="showDayWorkouts('${dateString}')">
+                        <div class="text-sm font-medium">${day}</div>
+                        ${hasWorkout ? '<div class="text-xs mt-1">●</div>' : ''}
+                    </div>
+                `;
+            }
+            
+            calendarGrid.innerHTML = calendarHTML;
+        }
+
+        function previousMonth() {
+            currentMonth--;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            generateCalendar();
+        }
+
+        function nextMonth() {
+            currentMonth++;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            generateCalendar();
+        }
+
+        function showDayWorkouts(dateString) {
+            const dayWorkouts = workouts.filter(w => w.date === dateString);
+            if (dayWorkouts.length > 0) {
+                // Switch to workouts tab and show filtered results
+                showTab('workouts');
+                // You could implement filtering here
+            } else {
+                // Open modal to create workout for this date
+                openWorkoutModal();
+                document.getElementById('workoutDate').value = dateString;
+            }
+        }
+
+        // Progress/Charts functions
+        function initializeCharts() {
+            updateFrequencyChart();
+            updateExerciseSelect();
+            updateProgressChart();
+        }
+
+        function updateFrequencyChart() {
+            const ctx = document.getElementById('frequencyChart').getContext('2d');
+            
+            // Destroy existing chart
+            if (frequencyChart) {
+                frequencyChart.destroy();
+            }
+            
+            // Get last 30 days data
+            const last30Days = [];
+            const workoutCounts = [];
+            
+            for (let i = 29; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const dateString = date.toISOString().split('T')[0];
+                const count = workouts.filter(w => w.date === dateString).length;
+                
+                last30Days.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                workoutCounts.push(count);
+            }
+            
+            frequencyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: last30Days,
+                    datasets: [{
+                        label: 'Workouts',
+                        data: workoutCounts,
+                        borderColor: '#2563EB',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateExerciseSelect() {
+            const select = document.getElementById('exerciseSelect');
+            const exercises = new Set();
+            
+            workouts.forEach(workout => {
+                workout.exercises.forEach(exercise => {
+                    exercises.add(exercise.name);
+                });
+            });
+            
+            select.innerHTML = '<option value="">Select an exercise</option>';
+            exercises.forEach(exercise => {
+                select.innerHTML += `<option value="${exercise}">${exercise}</option>`;
+            });
+        }
+
+        function updateProgressChart() {
+            const ctx = document.getElementById('progressChart').getContext('2d');
+            const selectedExercise = document.getElementById('exerciseSelect').value;
+            
+            // Destroy existing chart
+            if (progressChart) {
+                progressChart.destroy();
+            }
+            
+            if (!selectedExercise) {
+                // Show placeholder
+                progressChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: []
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+                return;
+            }
+            
+            // Collect data for selected exercise
+            const exerciseData = [];
+            workouts.forEach(workout => {
+                workout.exercises.forEach(exercise => {
+                    if (exercise.name === selectedExercise) {
+                        exerciseData.push({
+                            date: workout.date,
+                            weight: exercise.weight || 0,
+                            sets: exercise.sets,
+                            reps: exercise.reps
+                        });
+                    }
+                });
+            });
+            
+            // Sort by date
+            exerciseData.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            const dates = exerciseData.map(d => new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+            const weights = exerciseData.map(d => d.weight);
+            
+            progressChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Weight (lbs)',
+                        data: weights,
+                        borderColor: '#06B6D4',
+                        backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Templates tab
+        function populateTemplatesTab() {
+            const container = document.getElementById('templatesTabList');
+            container.innerHTML = templates.map(template => `
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h4 class="text-lg font-semibold text-gray-900 dark:text-white">${template.name}</h4>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">${template.exercises.length} exercises</p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="editTemplate(${template.id})" class="text-primary hover:text-primary-dark">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                            </button>
+                            ${template.id > 3 ? `<button onclick="showDeleteTemplateConfirm(${template.id})" class="text-red-500 hover:text-red-700">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>` : ''}
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        ${template.exercises.map(exercise => `
+                            <div class="text-sm text-gray-600 dark:text-gray-400 border-l-2 border-primary pl-3">
+                                ${exercise.name} - ${exercise.sets} sets × ${exercise.reps} reps${exercise.weight ? ` @ ${exercise.weight}lbs` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Main update function
+        function updateAllViews() {
+            updateDashboard();
+            updateWorkoutsList();
+            updateFrequencyChart();
+            updateExerciseSelect();
+            updateProgressChart();
+            generateCalendar();
+        }
+
+        // Workout management functions (previous functions remain the same)
+        function openWorkoutModal(workoutId = null) {
+            currentEditingId = workoutId;
+            const modal = document.getElementById('workoutModal');
+            const title = document.getElementById('modalTitle');
+            
+            if (workoutId) {
+                title.textContent = 'Edit Workout';
+                loadWorkoutForEdit(workoutId);
+            } else {
+                title.textContent = 'Add New Workout';
+                resetForm();
+                showTemplateSelection(true);
+            }
+            
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeWorkoutModal() {
+            document.getElementById('workoutModal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+            resetForm();
+        }
+
+        function resetForm() {
+            document.getElementById('workoutForm').reset();
+            document.getElementById('workoutDate').valueAsDate = new Date();
+            document.getElementById('exercisesList').innerHTML = '';
+            exerciseCounter = 0;
+            currentEditingId = null;
+        }
+
+        function addExercise() {
+            exerciseCounter++;
+            const exercisesList = document.getElementById('exercisesList');
+            const exerciseDiv = document.createElement('div');
+            exerciseDiv.className = 'border border-gray-200 dark:border-gray-600 rounded-lg p-4 fade-in';
+            exerciseDiv.dataset.exerciseId = exerciseCounter;
+            
+            exerciseDiv.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                    <h4 class="font-medium text-gray-900 dark:text-white">Exercise ${exerciseCounter}</h4>
+                    <button type="button" onclick="removeExercise(${exerciseCounter})" class="text-red-500 hover:text-red-700">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                    <div>
+                        <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Exercise Name</label>
+                        <input type="text" name="exerciseName" placeholder="e.g., Bench Press, Squats" class="w-full text-base px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Muscle Group</label>
+                        <input type="text" name="muscleGroup" placeholder="e.g., Chest, Legs" class="w-full text-base px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Sets</label>
+                        <input type="number" name="sets" min="1" placeholder="3" class="w-full text-base px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Reps</label>
+                        <input type="number" name="reps" min="1" placeholder="10" class="w-full text-base px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Weight (lbs)</label>
+                        <input type="number" name="weight" min="0" step="0.5" placeholder="135" class="w-full text-base px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white">
+                    </div>
+                </div>
+            `;
+            
+            exercisesList.appendChild(exerciseDiv);
+        }
+
+        function removeExercise(exerciseId) {
+            const exerciseDiv = document.querySelector(`[data-exercise-id="${exerciseId}"]`);
+            if (exerciseDiv) {
+                exerciseDiv.remove();
+            }
+        }
+
+        function handleWorkoutSubmit(e) {
+            e.preventDefault();
+            
+            const workoutDate = document.getElementById('workoutDate').value;
+            const workoutName = document.getElementById('workoutName').value;
+            
+            const exercises = [];
+            const exerciseDivs = document.querySelectorAll('#exercisesList > div');
+            
+            exerciseDivs.forEach(div => {
+                const exerciseName = div.querySelector('input[name="exerciseName"]').value;
+                const muscleGroup = div.querySelector('input[name="muscleGroup"]').value;
+                const sets = parseInt(div.querySelector('input[name="sets"]').value);
+                const reps = parseInt(div.querySelector('input[name="reps"]').value);
+                const weight = parseFloat(div.querySelector('input[name="weight"]').value) || 0;
+                
+                exercises.push({
+                    name: exerciseName,
+                    muscleGroup,
+                    sets,
+                    reps,
+                    weight
+                });
+            });
+            
+            const workout = {
+                id: currentEditingId || Date.now(),
+                date: workoutDate,
+                name: workoutName,
+                exercises: exercises,
+                createdAt: currentEditingId ? workouts.find(w => w.id === currentEditingId).createdAt : new Date().toISOString()
+            };
+            
+            if (currentEditingId) {
+                const index = workouts.findIndex(w => w.id === currentEditingId);
+                workouts[index] = workout;
+            } else {
+                workouts.push(workout);
+            }
+            
+            workouts.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            updateAllViews();
+            closeWorkoutModal();
+        }
+
+        function loadWorkoutForEdit(workoutId) {
+            const workout = workouts.find(w => w.id === workoutId);
+            if (!workout) return;
+            
+            document.getElementById('workoutDate').value = workout.date;
+            document.getElementById('workoutName').value = workout.name;
+            document.getElementById('templateSection').classList.add('hidden');
+            
+            document.getElementById('exercisesList').innerHTML = '';
+            exerciseCounter = 0;
+            
+            workout.exercises.forEach(exercise => {
+                addExercise();
+                const latestExercise = document.querySelector('#exercisesList > div:last-child');
+                latestExercise.querySelector('input[name="exerciseName"]').value = exercise.name;
+                latestExercise.querySelector('input[name="muscleGroup"]').value = exercise.muscleGroup || '';
+                latestExercise.querySelector('input[name="sets"]').value = exercise.sets;
+                latestExercise.querySelector('input[name="reps"]').value = exercise.reps;
+                latestExercise.querySelector('input[name="weight"]').value = exercise.weight || '';
+            });
+        }
+
+        function updateWorkoutsList() {
+            const emptyState = document.getElementById('emptyState');
+            const workoutsList = document.getElementById('workoutsList');
+            
+            if (workouts.length === 0) {
+                emptyState.classList.remove('hidden');
+                workoutsList.innerHTML = '';
+                return;
+            }
+            
+            emptyState.classList.add('hidden');
+            
+            workoutsList.innerHTML = workouts.map(workout => `
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 fade-in">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">${workout.name}</h3>
+                            <p class="text-gray-600 dark:text-gray-400">${formatDate(workout.date)}</p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="openWorkoutModal(${workout.id})" class="text-primary hover:text-primary-dark" title="Edit workout">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                            </button>
+                            <button onclick="saveWorkoutAsTemplate(${workout.id})" class="text-green-600 hover:text-green-700" title="Save as template">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                            </button>
+                            <button onclick="showDeleteConfirm(${workout.id})" class="text-red-500 hover:text-red-700" title="Delete workout">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        ${workout.exercises.map(exercise => `
+                            <div class="border-l-4 border-primary pl-4">
+                                <div class="flex justify-between items-center">
+                                    <h4 class="font-medium text-gray-900 dark:text-white">${exercise.name}</h4>
+                                    ${exercise.muscleGroup ? `<span class="text-sm text-gray-500 dark:text-gray-400">${exercise.muscleGroup}</span>` : ''}
+                                </div>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">
+                                    ${exercise.sets} sets × ${exercise.reps} reps${exercise.weight ? ` @ ${exercise.weight} lbs` : ''}
+                                </p>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            ${workout.exercises.length} exercise${workout.exercises.length !== 1 ? 's' : ''} • 
+                            ${workout.exercises.reduce((total, ex) => total + ex.sets, 0)} total sets
+                        </p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+        }
+
+        function showDeleteConfirm(workoutId) {
+            const modal = document.getElementById('confirmModal');
+            const confirmBtn = document.getElementById('confirmDeleteBtn');
+            
+            confirmBtn.onclick = () => {
+                deleteWorkout(workoutId);
+                closeConfirmModal();
+            };
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+        }
+
+        function deleteWorkout(workoutId) {
+            workouts = workouts.filter(w => w.id !== workoutId);
+            updateAllViews();
+        }
+
+        // Template functions
+        function showTemplateSelection(show = true) {
+            const templateSection = document.getElementById('templateSection');
+            if (show) {
+                templateSection.classList.remove('hidden');
+                populateTemplatesList();
+            } else {
+                templateSection.classList.add('hidden');
+                document.getElementById('exercisesList').innerHTML = '';
+                exerciseCounter = 0;
+                addExercise();
+            }
+        }
+
+        function populateTemplatesList() {
+            const templatesList = document.getElementById('templatesList');
+            templatesList.innerHTML = templates.map(template => `
+                <button type="button" onclick="loadTemplate(${template.id})" class="text-left p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors">
+                    <div class="font-medium text-gray-900 dark:text-white">${template.name}</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">${template.exercises.length} exercises</div>
+                </button>
+            `).join('');
+        }
+
+        function loadTemplate(templateId) {
+            const template = templates.find(t => t.id === templateId);
+            if (!template) return;
+
+            document.getElementById('workoutName').value = template.name;
+            document.getElementById('exercisesList').innerHTML = '';
+            exerciseCounter = 0;
+
+            template.exercises.forEach(exercise => {
+                addExercise();
+                const latestExercise = document.querySelector('#exercisesList > div:last-child');
+                latestExercise.querySelector('input[name="exerciseName"]').value = exercise.name;
+                latestExercise.querySelector('input[name="muscleGroup"]').value = exercise.muscleGroup || '';
+                latestExercise.querySelector('input[name="sets"]').value = exercise.sets;
+                latestExercise.querySelector('input[name="reps"]').value = exercise.reps;
+                latestExercise.querySelector('input[name="weight"]').value = exercise.weight || '';
+            });
+
+            showTemplateSelection(false);
+        }
+
+        function showTemplateManager() {
+            const modal = document.getElementById('templateManagerModal');
+            populateTemplatesManager();
+            modal.classList.remove('hidden');
+        }
+
+        function closeTemplateManager() {
+            document.getElementById('templateManagerModal').classList.add('hidden');
+        }
+
+        function populateTemplatesManager() {
+            const templatesManagerList = document.getElementById('templatesManagerList');
+            templatesManagerList.innerHTML = templates.map(template => `
+                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h4 class="font-medium text-gray-900 dark:text-white">${template.name}</h4>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">${template.exercises.length} exercises</p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="editTemplate(${template.id})" class="text-primary hover:text-primary-dark">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                            </button>
+                            ${template.id > 3 ? `<button onclick="showDeleteTemplateConfirm(${template.id})" class="text-red-500 hover:text-red-700">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>` : ''}
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        ${template.exercises.map(exercise => `
+                            <div class="text-sm text-gray-600 dark:text-gray-400">
+                                ${exercise.name} - ${exercise.sets}×${exercise.reps}${exercise.weight ? ` @ ${exercise.weight}lbs` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function editTemplate(templateId) {
+            closeTemplateManager();
+            closeWorkoutModal();
+            
+            setTimeout(() => {
+                currentEditingId = null;
+                const modal = document.getElementById('workoutModal');
+                const title = document.getElementById('modalTitle');
+                title.textContent = 'Edit Template';
+                
+                const template = templates.find(t => t.id === templateId);
+                if (template) {
+                    document.getElementById('workoutName').value = template.name;
+                    document.getElementById('workoutDate').value = new Date().toISOString().split('T')[0];
+                    document.getElementById('templateSection').classList.add('hidden');
+                    
+                    document.getElementById('exercisesList').innerHTML = '';
+                    exerciseCounter = 0;
+                    
+                    template.exercises.forEach(exercise => {
+                        addExercise();
+                        const latestExercise = document.querySelector('#exercisesList > div:last-child');
+                        latestExercise.querySelector('input[name="exerciseName"]').value = exercise.name;
+                        latestExercise.querySelector('input[name="muscleGroup"]').value = exercise.muscleGroup || '';
+                        latestExercise.querySelector('input[name="sets"]').value = exercise.sets;
+                        latestExercise.querySelector('input[name="reps"]').value = exercise.reps;
+                        latestExercise.querySelector('input[name="weight"]').value = exercise.weight || '';
+                    });
+                    
+                    const form = document.getElementById('workoutForm');
+                    form.onsubmit = (e) => handleTemplateEdit(e, templateId);
+                }
+                
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            }, 100);
+        }
+
+        function handleTemplateEdit(e, templateId) {
+            e.preventDefault();
+            
+            const workoutName = document.getElementById('workoutName').value;
+            
+            const exercises = [];
+            const exerciseDivs = document.querySelectorAll('#exercisesList > div');
+            
+            exerciseDivs.forEach(div => {
+                const exerciseName = div.querySelector('input[name="exerciseName"]').value;
+                const muscleGroup = div.querySelector('input[name="muscleGroup"]').value;
+                const sets = parseInt(div.querySelector('input[name="sets"]').value);
+                const reps = parseInt(div.querySelector('input[name="reps"]').value);
+                const weight = parseFloat(div.querySelector('input[name="weight"]').value) || 0;
+                
+                exercises.push({
+                    name: exerciseName,
+                    muscleGroup,
+                    sets,
+                    reps,
+                    weight
+                });
+            });
+            
+            const templateIndex = templates.findIndex(t => t.id === templateId);
+            templates[templateIndex] = {
+                id: templateId,
+                name: workoutName,
+                exercises: exercises
+            };
+            
+            const form = document.getElementById('workoutForm');
+            form.onsubmit = handleWorkoutSubmit;
+            
+            closeWorkoutModal();
+            populateTemplatesTab();
+        }
+
+        function saveWorkoutAsTemplate(workoutId) {
+            const workout = workouts.find(w => w.id === workoutId);
+            if (!workout) return;
+            
+            const newTemplate = {
+                id: Date.now(),
+                name: workout.name + " Template",
+                exercises: workout.exercises.map(ex => ({...ex}))
+            };
+            
+            templates.push(newTemplate);
+            populateTemplatesList();
+            populateTemplatesManager();
+            populateTemplatesTab();
+            
+            showNotification('Template created successfully!', 'success');
+        }
+
+        function showDeleteTemplateConfirm(templateId) {
+            const modal = document.getElementById('confirmModal');
+            const confirmBtn = document.getElementById('confirmDeleteBtn');
+            const confirmMessage = document.getElementById('confirmMessage');
+            
+            confirmMessage.textContent = 'Are you sure you want to delete this template? This action cannot be undone.';
+            
+            confirmBtn.onclick = () => {
+                deleteTemplate(templateId);
+                closeConfirmModal();
+            };
+            
+            modal.classList.remove('hidden');
+        }
+
+        function deleteTemplate(templateId) {
+            templates = templates.filter(t => t.id !== templateId);
+            populateTemplatesManager();
+            populateTemplatesList();
+            populateTemplatesTab();
+        }
+
+        // Export/Import functions
+        function exportData() {
+            const data = {
+                workouts: workouts,
+                templates: templates.filter(t => t.id > 3),
+                exportDate: new Date().toISOString(),
+                version: "2.0"
+            };
+            
+            const dataStr = JSON.stringify(data, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `tt-fitness-workouts-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showNotification('Data exported successfully!', 'success');
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if (!data.workouts || !Array.isArray(data.workouts)) {
+                        throw new Error('Invalid file format: missing workouts data');
+                    }
+                    
+                    if (data.workouts.length > 0) {
+                        workouts = [...workouts, ...data.workouts];
+                        const uniqueWorkouts = [];
+                        const seenIds = new Set();
+                        workouts.forEach(workout => {
+                            if (!seenIds.has(workout.id)) {
+                                seenIds.add(workout.id);
+                                uniqueWorkouts.push(workout);
+                            }
+                        });
+                        workouts = uniqueWorkouts;
+                        workouts.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    }
+                    
+                    if (data.templates && Array.isArray(data.templates)) {
+                        data.templates.forEach(template => {
+                            if (template.id > 3) {
+                                const existingIndex = templates.findIndex(t => t.id === template.id);
+                                if (existingIndex === -1) {
+                                    templates.push(template);
+                                }
+                            }
+                        });
+                    }
+                    
+                    updateAllViews();
+                    populateTemplatesTab();
+                    
+                    showNotification(`Successfully imported ${data.workouts.length} workouts${data.templates ? ` and ${data.templates.length} templates` : ''}!`, 'success');
+                    
+                } catch (error) {
+                    console.error('Import error:', error);
+                    showNotification('Error importing file: ' + error.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-lg max-w-sm fade-in ${
+                type === 'success' ? 'bg-green-500 text-white' : 
+                type === 'error' ? 'bg-red-500 text-white' : 
+                'bg-blue-500 text-white'
+            }`;
+            notification.innerHTML = `
+                <div class="flex items-center space-x-2">
+                    <span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        document.body.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
